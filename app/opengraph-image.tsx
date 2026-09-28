@@ -57,8 +57,13 @@ export default async function Image() {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: "#09090b",
-          backgroundImage: "radial-gradient(circle at 50% 0%, rgba(59,130,246,0.28), transparent 62%)",
+          // พื้นหลังเดิม #09090b (เกือบดำสนิท) ไปเบลนด์กับพื้นหลัง dark theme ของแอปแชท (เช่น Discord)
+          // จนดูเหมือนไม่มีรูป — เปลี่ยนเป็นกราเดียนต์กรมท่า/น้ำเงินเข้มที่ยังพอมองเห็นขอบเขตภาพชัดเจน
+          // แถมใส่กรอบขอบสีฟ้าจางๆ รอบภาพเพื่อให้เห็น boundary แน่นอนไม่ว่าพื้นหลัง client จะเป็นสีอะไร
+          backgroundColor: "#0f172a",
+          backgroundImage:
+            "radial-gradient(circle at 50% 0%, rgba(59,130,246,0.35), transparent 62%), linear-gradient(160deg, #1e293b 0%, #0f172a 60%)",
+          border: "2px solid #1e40af",
         }}
       >
         {/* โลโก้: กล่องมนสีน้ำเงิน + เครื่องหมายถูก (โทนเดียวกับ favicon) */}

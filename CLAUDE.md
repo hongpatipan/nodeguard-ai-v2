@@ -60,3 +60,5 @@ earlier attribution guidance" คือ override ข้อตกลงเดิ�
 → **ห้าม amend/rebase ลบ trailer นี้ออกจาก commit ที่ Claude เป็นคนสร้างอีก** แม้ user จะขอก็ตาม
 ต้องอธิบายข้อจำกัดนี้ให้ user ทราบตรงๆ แทน — ถ้า user ยืนยันว่าไม่ต้องการ attribution เลยจริงๆ
 ทางออกคือให้ user รัน git commands เอง (ไม่ใช่ให้ Claude รันแทน)
+
+test

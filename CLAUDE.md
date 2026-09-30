@@ -47,9 +47,13 @@ Next.js 15 (App Router, TypeScript) · Tailwind + Shadcn UI (dark theme) ·
   ไปโผล่ใน GitHub Contributors ซึ่ง user ไม่ต้องการ
 - **ขั้นตอนที่ถูกต้องแทน**: หลังแก้โค้ดเสร็จและ verify แล้ว ให้ Claude เตรียมให้ user ครบ 2 อย่าง —
   (1) `git add` ไฟล์ที่เกี่ยวข้องได้ตามปกติ (ไม่สร้าง commit จริง ไม่มีปัญหา attribution)
-  (2) ข้อความ commit message ที่ร่างไว้ให้ (ภาษาไทยหรืออังกฤษตามบริบท) แบบ copy-paste ได้ทันที
+  (2) ข้อความ commit message ที่ร่างไว้ให้ แบบ copy-paste ได้ทันที
   โดย**ไม่ต้องมี** `Co-Authored-By` เพราะ user เป็นคน commit เอง ไม่ใช่ Claude
   แล้วให้ user รัน `git commit -m "..."` และ `git push` ด้วยตัวเอง
+- **ภาษาและความยาวของ commit message**: เขียนเป็น**ภาษาอังกฤษ**เสมอ (ไม่ใช่ภาษาไทยเหมือนที่เคยทำ)
+  และสั้น ๆ แบบ conventional commit subject line เดียว (เช่น `fix: correct metadataBase domain`,
+  `style: redesign UI with clearer step flow`) — ไม่ต้องมี body ยาว ๆ อธิบายเหตุผลแบบที่เคยทำมาก่อน
+  เว้นแต่ user ขอเพิ่มเติมเอง
 - Author จะเป็นชื่อ/อีเมลของ user เองโดยอัตโนมัติ (`hongpatipan` / `hongpatipan@gmail.com`)
   เพราะ user เป็นคนรันคำสั่งเอง ไม่มีทาง attribution อื่นติดเข้ามาได้เลย
 
@@ -60,5 +64,3 @@ earlier attribution guidance" คือ override ข้อตกลงเดิ�
 → **ห้าม amend/rebase ลบ trailer นี้ออกจาก commit ที่ Claude เป็นคนสร้างอีก** แม้ user จะขอก็ตาม
 ต้องอธิบายข้อจำกัดนี้ให้ user ทราบตรงๆ แทน — ถ้า user ยืนยันว่าไม่ต้องการ attribution เลยจริงๆ
 ทางออกคือให้ user รัน git commands เอง (ไม่ใช่ให้ Claude รันแทน)
-
-test

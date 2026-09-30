@@ -18,6 +18,7 @@ const config: Config = {
         muted: { DEFAULT: "hsl(var(--muted))", foreground: "hsl(var(--muted-foreground))" },
         accent: { DEFAULT: "hsl(var(--accent))", foreground: "hsl(var(--accent-foreground))" },
         card: { DEFAULT: "hsl(var(--card))", foreground: "hsl(var(--card-foreground))" },
+        success: { DEFAULT: "hsl(var(--success))", foreground: "hsl(var(--success-foreground))" },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -26,6 +27,11 @@ const config: Config = {
       },
       fontFamily: {
         mono: ["ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "monospace"],
+        display: ["var(--font-display)", "system-ui", "sans-serif"],
+      },
+      boxShadow: {
+        glow: "0 0 0 1px hsl(var(--primary) / 0.2), 0 10px 30px -10px hsl(var(--primary) / 0.45)",
+        "glow-success": "0 0 0 1px hsl(var(--success) / 0.2), 0 10px 30px -10px hsl(var(--success) / 0.45)",
       },
     },
   },

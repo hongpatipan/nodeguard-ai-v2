@@ -1,5 +1,15 @@
 import type { Metadata } from "next";
+import { Space_Grotesk } from "next/font/google";
 import "./globals.css";
+
+// ใช้เฉพาะหัวข้อ/แบรนด์ (ข้อความอังกฤษ) — Space Grotesk ไม่มี glyph ภาษาไทย ข้อความไทย
+// (คำอธิบาย, เนื้อหา) ยังใช้ system font เดิมตามปกติ ไม่กระทบ
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-display",
+  display: "swap",
+});
 
 const TITLE = "NodeGuard AI (Gemini Edition)";
 const DESCRIPTION = "รีวิวโค้ด Node.js ด้วย Gemini — หา Event Loop Blocking, Memory Leak, N+1 Query และช่องโหว่";
@@ -30,7 +40,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="th" className="dark">
+    <html lang="th" className={`dark ${spaceGrotesk.variable}`}>
       <body>{children}</body>
     </html>
   );

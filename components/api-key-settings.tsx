@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Eye, EyeOff, KeyRound, Trash2 } from "lucide-react";
+import { Check, ChevronDown, Eye, EyeOff, KeyRound, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "nodeguard-ai:gemini-api-key";
 
@@ -40,8 +41,14 @@ export function ApiKeySettings({ apiKey, onChange }: Props) {
   const [draft, setDraft] = useState(apiKey);
   const [show, setShow] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+  // ยุบไว้เป็นค่าเริ่มต้นสำหรับคนใหม่ที่ยังไม่เคยตั้ง key (ไม่บังคับใช้ ไม่ต้องมาเจอฟอร์มนี้ก่อนงานจริง)
+  // แต่ถ้าเคยตั้ง key ไว้แล้วให้กางออกให้เห็นเลย เผื่ออยากแก้/ล้าง
+  const [expanded, setExpanded] = useState(Boolean(apiKey));
 
   useEffect(() => setDraft(apiKey), [apiKey]);
+  useEffect(() => {
+    if (apiKey) setExpanded(true);
+  }, [apiKey]);
 
   function save() {
     const trimmed = draft.trim();
@@ -60,23 +67,32 @@ export function ApiKeySettings({ apiKey, onChange }: Props) {
 
   return (
     <Card className="mb-6">
-      <CardHeader className="pb-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <KeyRound className="h-4 w-4 text-primary" />
-          <CardTitle className="text-base">Gemini API Key</CardTitle>
-          {apiKey ? (
-            <Badge variant="default">ใช้ key ส่วนตัวของคุณ</Badge>
-          ) : (
-            <Badge variant="secondary">ยังไม่ได้ตั้ง — จะใช้ key กลางของ server ถ้ามี</Badge>
-          )}
-        </div>
-        <CardDescription>
-          เก็บไว้ใน localStorage ของเบราว์เซอร์คุณเท่านั้น ไม่ถูกบันทึกที่ server — เหมาะกับทีมที่แชร์เว็บนี้
-          ให้แต่ละคนใส่ key ของตัวเอง (ขอฟรีได้ที่ aistudio.google.com/apikey) ปล่อยว่างได้ถ้า admin ตั้ง{" "}
-          <code className="font-mono">GEMINI_API_KEY</code> กลางไว้ที่ server แล้ว
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full flex-wrap items-center gap-2 p-5 text-left"
+      >
+        <KeyRound className="h-4 w-4 text-primary" />
+        <span className="font-display text-sm font-semibold">Gemini API Key</span>
+        {apiKey ? (
+          <Badge variant="default">ใช้ key ส่วนตัวของคุณ</Badge>
+        ) : (
+          <Badge variant="secondary">ไม่บังคับ — ใช้ key กลางของ server ถ้ามี</Badge>
+        )}
+        <ChevronDown
+          className={cn("ml-auto h-4 w-4 text-muted-foreground transition-transform", expanded && "rotate-180")}
+        />
+      </button>
+      {expanded ? (
+        <>
+          <CardHeader className="-mt-3 pb-3 pt-0">
+            <CardDescription>
+              เก็บไว้ใน localStorage ของเบราว์เซอร์คุณเท่านั้น ไม่ถูกบันทึกที่ server — เหมาะกับทีมที่แชร์เว็บนี้
+              ให้แต่ละคนใส่ key ของตัวเอง (ขอฟรีได้ที่ aistudio.google.com/apikey) ปล่อยว่างได้ถ้า admin ตั้ง{" "}
+              <code className="font-mono">GEMINI_API_KEY</code> กลางไว้ที่ server แล้ว
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 pt-0 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Input
             type={show ? "text" : "password"}
@@ -111,7 +127,9 @@ export function ApiKeySettings({ apiKey, onChange }: Props) {
             </Button>
           ) : null}
         </div>
-      </CardContent>
+          </CardContent>
+        </>
+      ) : null}
     </Card>
   );
 }

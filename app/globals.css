@@ -4,24 +4,28 @@
 
 @layer base {
   :root {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 8% 6%;
-    --card-foreground: 0 0% 98%;
+    /* โทนกรมท่า/น้ำเงินเข้มแทนดำสนิท — ให้ภาพรวมดูเป็นแบรนด์เดียวกับ favicon/OG image
+       ไม่ใช่ zinc-900 เริ่มต้นของ shadcn ที่ดูเป็นเทมเพลตสำเร็จรูป */
+    --background: 224 39% 5%;
+    --foreground: 210 20% 98%;
+    --card: 224 32% 8%;
+    --card-foreground: 210 20% 98%;
     --primary: 217 91% 60%;
-    --primary-foreground: 224 71% 8%;
-    --secondary: 240 4% 16%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 4% 14%;
-    --muted-foreground: 240 5% 65%;
-    --accent: 240 4% 16%;
-    --accent-foreground: 0 0% 98%;
+    --primary-foreground: 224 47% 7%;
+    --secondary: 223 24% 14%;
+    --secondary-foreground: 210 20% 98%;
+    --muted: 223 22% 12%;
+    --muted-foreground: 217 14% 65%;
+    --accent: 223 24% 15%;
+    --accent-foreground: 210 20% 98%;
+    --success: 160 84% 39%;
+    --success-foreground: 224 47% 7%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 4% 18%;
-    --input: 240 4% 18%;
+    --border: 223 20% 19%;
+    --input: 223 20% 19%;
     --ring: 217 91% 60%;
-    --radius: 0.65rem;
+    --radius: 0.75rem;
   }
 
   * {
@@ -31,5 +35,34 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
+    /* กราเดียนต์เรือง ๆ ด้านบนจาง ๆ + จุดตารางถี่บาง ๆ ทั่วหน้า — ให้พื้นหลังมีมิติแทนที่จะแบนราบทึบสีเดียว */
+    background-image:
+      radial-gradient(ellipse 900px 520px at 50% -8%, hsl(217 91% 60% / 0.14), transparent 62%),
+      radial-gradient(circle at 1px 1px, hsl(210 20% 98% / 0.05) 1px, transparent 0);
+    background-size:
+      100% 100%,
+      22px 22px;
+    background-attachment: fixed, fixed;
+  }
+
+  ::selection {
+    background-color: hsl(var(--primary) / 0.3);
+    color: hsl(var(--foreground));
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 999px;
+    border: 2px solid hsl(var(--background));
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.4);
   }
 }

@@ -3,8 +3,9 @@
  * ใช้เป็นทางเลือกตอน Gemini quota หมด หรือใครอยากได้ผลไวๆ โดยไม่เสีย token
  *
  * ข้อจำกัดที่ตั้งใจ: ครอบคลุมแค่ pattern ที่ตรวจจับได้แน่นอนด้วย AST (sync I/O, eval, unsafe regex,
- * path/command injection) — ไม่ครอบคลุม N+1 query, memory leak เชิง lifecycle, หรือปัญหาที่ต้องเข้าใจ
- * บริบทข้ามไฟล์ ซึ่งเป็นจุดที่ AI review (lib/prompts.ts) ยังทำได้ดีกว่ามาก
+ * path/command injection, ฟังก์ชันซับซ้อน/ซ้ำซ้อนที่ eslint-plugin-sonarjs จับได้) — ไม่ครอบคลุม
+ * N+1 query, memory leak เชิง lifecycle, หรือปัญหาที่ต้องเข้าใจบริบทข้ามไฟล์ ซึ่งเป็นจุดที่ AI review
+ * (lib/prompts.ts) ยังทำได้ดีกว่ามาก
  *
  * หมายเหตุสำคัญ: ESLint flat config (v9+) จับคู่ config กับไฟล์ด้วย `files` glob — ถ้าไม่ระบุ
  * นามสกุล .ts/.tsx ไว้ใน `files` ตรงๆ ไฟล์ TypeScript จะไม่ถูกสแกนเลย (getConfig คืน null แบบเงียบๆ
@@ -13,6 +14,7 @@
 import { Linter } from "eslint";
 import * as tsParserModule from "@typescript-eslint/parser";
 import security from "eslint-plugin-security";
+import sonarjs from "eslint-plugin-sonarjs";
 
 import type { FilterStats } from "./node-diff-filter";
 import type { Issue, Review, ReviewResponse } from "./types";
@@ -88,7 +90,7 @@ const CONFIG = [
       sourceType: "module" as const,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
-    plugins: { security },
+    plugins: { security, sonarjs },
     rules: {
       "no-restricted-properties": ["error", ...RESTRICTED_SYNC_PROPERTIES],
       "no-restricted-imports": ["error", { paths: RESTRICTED_SYNC_IMPORTS }],
@@ -100,6 +102,12 @@ const CONFIG = [
       "security/detect-non-literal-fs-filename": "warn",
       "security/detect-child-process": "warn",
       "security/detect-possible-timing-attacks": "warn",
+      "sonarjs/cognitive-complexity": "error",
+      "sonarjs/no-identical-functions": "error",
+      "sonarjs/no-identical-conditions": "error",
+      "sonarjs/no-all-duplicated-branches": "error",
+      "sonarjs/no-collapsible-if": "warn",
+      "sonarjs/no-nested-conditional": "warn",
     },
   },
 ] as unknown as Linter.Config[];
@@ -183,6 +191,48 @@ const RULE_META: Record<string, RuleMeta> = {
     impact: "เสี่ยง timing attack ในการเดา token/password ทีละตัวอักษร",
     fixHint: "ใช้ crypto.timingSafeEqual แทนการเปรียบเทียบ string ตรงๆ",
   },
+  "sonarjs/cognitive-complexity": {
+    severity: "optimization",
+    category: "code-quality-complexity",
+    title: "ฟังก์ชันซับซ้อนเกินไป (cognitive complexity สูง)",
+    impact: "อ่าน/แก้/เทสต์ยาก เสี่ยงเกิดบั๊กตอนแก้ไขเพราะตามโฟลว์ไม่ทัน",
+    fixHint: "แตกเป็นฟังก์ชันย่อยตามความรับผิดชอบ หรือใช้ early return ลดการซ้อน if/else",
+  },
+  "sonarjs/no-identical-functions": {
+    severity: "optimization",
+    category: "code-quality-complexity",
+    title: "มีฟังก์ชันที่ทำงานเหมือนกันทุกตัวอักษร",
+    impact: "แก้บั๊กแล้วลืมแก้อีกจุด เพราะโค้ดซ้ำกันหลายที่",
+    fixHint: "รวมเป็นฟังก์ชันเดียวแล้วเรียกใช้ซ้ำ",
+  },
+  "sonarjs/no-identical-conditions": {
+    severity: "warning",
+    category: "code-quality-complexity",
+    title: "เงื่อนไขซ้ำกันใน if-else if เดียวกัน",
+    impact: "branch ที่สองไม่มีวันถูกเรียกถึง มักเป็นสัญญาณว่าลืมแก้เงื่อนไขให้ต่างกัน (copy-paste bug)",
+    fixHint: "ตรวจสอบว่าเงื่อนไขที่ตั้งใจไว้จริงๆ คืออะไร แก้ให้ต่างจาก branch ก่อนหน้า",
+  },
+  "sonarjs/no-all-duplicated-branches": {
+    severity: "warning",
+    category: "code-quality-complexity",
+    title: "ทุก branch ของ if/else หรือ switch ทำงานเหมือนกันหมด",
+    impact: "เงื่อนไขที่เขียนไว้ไม่มีผลอะไรเลย มักเป็นสัญญาณว่าลืมใส่ logic ที่ต่างกันในบาง branch",
+    fixHint: "ตรวจสอบว่าแต่ละ branch ควรทำงานต่างกันจริงไหม ถ้าเหมือนกันจริงให้รวมเป็น branch เดียว",
+  },
+  "sonarjs/no-collapsible-if": {
+    severity: "optimization",
+    category: "code-quality-complexity",
+    title: "if ซ้อน if ที่รวมเป็นเงื่อนไขเดียวได้",
+    impact: "เพิ่มความซับซ้อนโดยไม่จำเป็น อ่านยากกว่าที่ควรจะเป็น",
+    fixHint: "รวมเงื่อนไขทั้งสองด้วย && เป็น if เดียว",
+  },
+  "sonarjs/no-nested-conditional": {
+    severity: "optimization",
+    category: "code-quality-complexity",
+    title: "Ternary ซ้อน ternary หลายชั้น",
+    impact: "อ่านยากว่ากิ่งไหนตรงกับเงื่อนไขไหน เสี่ยงตีความผิดตอนแก้ไข",
+    fixHint: "แยกเป็น if/else หรือ switch แทน หรือดึงเป็นฟังก์ชันช่วยที่ตั้งชื่อสื่อความหมาย",
+  },
 };
 
 function extractLineSnippet(code: string, line: number): string {
@@ -260,8 +310,9 @@ export function buildQuickScanResponse(
 
   const summary =
     `Quick Scan (ESLint, ไม่ใช้ AI) สแกน ${files.length} ไฟล์ พบ ${allIssues.length} ปัญหา — ` +
-    `ครอบคลุมเฉพาะ pattern ที่ตรวจจับได้แน่นอน (sync I/O, eval, unsafe regex, path/command injection) ` +
-    `ไม่ครอบคลุม N+1 query หรือปัญหาเชิงบริบทที่ต้องใช้ AI ช่วยวิเคราะห์ — กด "Review with AI" เพื่อผลที่ครอบคลุมกว่านี้${parseErrorNote}`;
+    `ครอบคลุมเฉพาะ pattern ที่ตรวจจับได้แน่นอน (sync I/O, eval, unsafe regex, path/command injection, ` +
+    `ฟังก์ชันซับซ้อน/ซ้ำซ้อน) ไม่ครอบคลุม N+1 query หรือปัญหาเชิงบริบทที่ต้องใช้ AI ช่วยวิเคราะห์ — ` +
+    `กด "Review with AI" เพื่อผลที่ครอบคลุมกว่านี้${parseErrorNote}`;
 
   const totalChars = files.reduce((s, f) => s + f.content.length, 0);
 

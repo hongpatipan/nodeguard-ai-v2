@@ -3,7 +3,7 @@
 Personal dashboard ที่ทำอย่างเดียว: **review โค้ด Node.js (JS/TS) หาปัญหาที่เกิดเฉพาะกับ Node.js runtime**
 ขับเคลื่อนด้วย **Google Gemini** (Free Tier ผ่าน Google AI Studio — ไม่ต้องผูกบัตรเครดิต)
 
-## ขอบเขตการรีวิว (4 หมวดเท่านั้น)
+## ขอบเขตการรีวิว (5 หมวดเท่านั้น)
 
 | หมวด | ตัวอย่างที่จับ |
 |---|---|
@@ -11,8 +11,11 @@ Personal dashboard ที่ทำอย่างเดียว: **review โ�
 | Memory Leaks & Async | unhandled rejection, async ไม่มี try/catch, module-level shared state, listener/interval ค้าง, cache ไม่มี TTL |
 | Database & I/O | N+1 query, ไม่มี pagination/LIMIT, โหลดทั้งตารางเข้า memory, ไม่มี pool/timeout/transaction |
 | Security & Error Handling | unsanitized input, SQL/NoSQL/command injection, prototype pollution, log secret, ส่ง stack trace กลับ client |
+| Code Quality & Complexity | cognitive complexity สูง, ฟังก์ชัน/เงื่อนไขที่ซ้ำกันทุกตัวอักษร (มักเป็น copy-paste bug), if ซ้อน if ที่รวมได้, ternary ซ้อนหลายชั้น |
 
-เรื่อง style / naming / การเลือก library **ไม่อยู่ในขอบเขต** — system instruction สั่งห้ามไว้ชัดเจน
+เรื่อง naming / code formatting / การเลือก library **ไม่อยู่ในขอบเขต** — system instruction สั่งห้ามไว้ชัดเจน
+(หมวด Code Quality & Complexity เน้นโครงสร้าง/ความซับซ้อนที่กระทบการดูแลรักษาและความเสี่ยงเกิดบั๊ก
+ไม่ใช่เรื่อง style เช่น การตั้งชื่อตัวแปรหรือการเว้นวรรค)
 
 ## Stack
 
@@ -104,7 +107,8 @@ Gemini ไม่มี `cache_control` ให้ตั้งเองแบบ C
 
 **ครอบคลุม:** sync I/O ที่บล็อก event loop (`fs.readFileSync`, `execSync` ฯลฯ — ทั้งแบบ
 `fs.readFileSync()` และ `import { readFileSync } from "fs"`), `eval()`/`setTimeout` ด้วย string,
-unsafe regex (ReDoS), path/command injection ที่ไม่ใช่ literal (ผ่าน `eslint-plugin-security`)
+unsafe regex (ReDoS), path/command injection ที่ไม่ใช่ literal (ผ่าน `eslint-plugin-security`),
+ฟังก์ชันซับซ้อนเกินไป/โค้ด-เงื่อนไขซ้ำซ้อน (ผ่าน `eslint-plugin-sonarjs` — หมวด Code Quality & Complexity)
 
 **ไม่ครอบคลุม:** N+1 query, memory leak เชิง lifecycle, หรือปัญหาที่ต้องเข้าใจบริบทข้ามไฟล์ — จุดที่
 AI review (`lib/prompts.ts`) ยังทำได้ดีกว่ามาก ผลลัพธ์จาก Quick Scan จะบอกไว้ตรง ๆ ในสรุปทุกครั้งว่า
@@ -122,7 +126,7 @@ AI review (`lib/prompts.ts`) ยังทำได้ดีกว่ามาก
 จึง reuse `ReviewDashboard` component และเก็บลง Dashboard history ได้เหมือนกันทุกอย่าง
 
 > **หมายเหตุสำหรับคน deploy เอง:** ต้องมี `serverExternalPackages: ["eslint", "@typescript-eslint/parser",
-> "eslint-plugin-security"]` ใน `next.config.mjs` (ตั้งไว้แล้ว) ไม่งั้น Next.js server bundler จะทำให้
+> "eslint-plugin-security", "eslint-plugin-sonarjs"]` ใน `next.config.mjs` (ตั้งไว้แล้ว) ไม่งั้น Next.js server bundler จะทำให้
 > `@typescript-eslint/parser` resolve เป็น `undefined` แบบเงียบ ๆ (ปัญหา ESM/CJS interop เฉพาะทาง) ทำให้
 > ESLint fallback ไปใช้ parser พื้นฐานที่ไม่เข้าใจ syntax ของ TypeScript แล้ว parse ไฟล์ .ts ทุกไฟล์ไม่ผ่าน
 

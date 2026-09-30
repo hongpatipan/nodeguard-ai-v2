@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronDown, FileCode2, ShieldAlert, Timer, Database, Bug, CheckCircle2, RefreshCw } from "lucide-react";
+import { ChevronDown, FileCode2, ShieldAlert, Timer, Database, Bug, CheckCircle2, RefreshCw, GitBranch } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +20,7 @@ const CATEGORY_ICONS = {
   "memory-leak-async": Bug,
   "database-io": Database,
   "security-error-handling": ShieldAlert,
+  "code-quality-complexity": GitBranch,
 };
 
 function CodeBlock({ title, code, tone }: { title: string; code: string; tone: "before" | "after" }) {

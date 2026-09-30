@@ -6,6 +6,7 @@ export const CATEGORIES = [
   "memory-leak-async",
   "database-io",
   "security-error-handling",
+  "code-quality-complexity",
 ] as const;
 
 export const IssueSchema = z.object({
@@ -46,4 +47,5 @@ export const CATEGORY_LABELS: Record<(typeof CATEGORIES)[number], string> = {
   "memory-leak-async": "Memory Leaks & Async",
   "database-io": "Database & I/O",
   "security-error-handling": "Security & Error Handling",
+  "code-quality-complexity": "Code Quality & Complexity",
 };

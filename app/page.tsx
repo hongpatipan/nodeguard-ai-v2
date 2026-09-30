@@ -21,6 +21,7 @@ const CHECKLIST = [
   { title: "Memory Leaks & Async", detail: "unhandled rejection, shared state, listener ค้าง" },
   { title: "Database & I/O", detail: "N+1, ไม่มี pagination, pool/timeout" },
   { title: "Security & Errors", detail: "unsanitized input, injection, log ข้อมูลอ่อนไหว" },
+  { title: "Code Quality & Complexity", detail: "ฟังก์ชันซับซ้อนเกินไป, โค้ด/เงื่อนไขซ้ำซ้อน" },
 ];
 
 export default function Home() {
@@ -100,7 +101,7 @@ export default function Home() {
           รีวิวเฉพาะปัญหาของ Node.js runtime ด้วย Gemini — กรองไฟล์ที่ไม่ใช่ logic ออก ส่งเฉพาะ diff
           เพื่อประหยัด token และใช้โควตา Free Tier ได้นานขึ้น
         </p>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
           {CHECKLIST.map((c) => (
             <div key={c.title} className="rounded-md border border-border bg-card px-3 py-2">
               <div className="text-xs font-medium">{c.title}</div>

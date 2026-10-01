@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 
 import { looksLikeDiff } from "@/lib/node-diff-filter";
+import { logReviewFailure, logReviewResult } from "@/lib/review-log";
 import { buildQuickScanResponse } from "@/lib/static-scan";
 import { fetchChangedFileContents } from "@/lib/vcs";
 
@@ -37,6 +38,9 @@ export async function POST(request: Request) {
         );
       }
       const response = buildQuickScanResponse(result.files, result.skippedFiles, result.source, result.totalFiles);
+      after(() =>
+        logReviewResult({ sourceKind: result.source.kind, sourceLabel: result.source.label, model: "quick-scan", result: response }),
+      );
       return NextResponse.json(response);
     }
 
@@ -52,18 +56,18 @@ export async function POST(request: Request) {
         );
       }
       const code = body.code.slice(0, MAX_CODE_CHARS);
-      const response = buildQuickScanResponse(
-        [{ path: "pasted-code.ts", content: code }],
-        [],
-        { kind: "paste", label: "pasted code" },
-        1,
-      );
+      const source = { kind: "paste" as const, label: "pasted code" };
+      const response = buildQuickScanResponse([{ path: "pasted-code.ts", content: code }], [], source, 1);
+      after(() => logReviewResult({ sourceKind: source.kind, sourceLabel: source.label, model: "quick-scan", result: response }));
       return NextResponse.json(response);
     }
 
     return NextResponse.json({ error: "ต้องส่ง url หรือ code อย่างใดอย่างหนึ่ง" }, { status: 400 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "quick scan ล้มเหลว";
+    // Quick Scan ไม่เรียก Gemini เลย (แค่ ESLint) — error ที่นี่มักเป็น bug/edge case จริง ไม่ใช่
+    // rate limit หรือ key ผิดแบบฝั่ง AI review เลยนับเป็น FAILED log ได้เลยไม่ต้องแยกเคส
+    after(() => logReviewFailure({ sourceKind: "quick-scan", sourceLabel: "quick scan", model: "quick-scan", errorMessage: message }));
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

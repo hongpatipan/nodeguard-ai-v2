@@ -19,13 +19,15 @@ Personal dashboard ที่ทำอย่างเดียว: **review โ�
 
 ## Stack
 
-Next.js 15 (App Router) · TypeScript · Tailwind CSS + Shadcn UI (dark) · `@google/genai` (structured JSON output) · GitHub REST API + GitLab REST API (v4)
+Next.js 15 (App Router) · TypeScript · Tailwind CSS + Shadcn UI (dark) · `@google/genai` (structured JSON output) · GitHub REST API + GitLab REST API (v4) · Prisma 7 + PostgreSQL (History Log)
 
 ## ติดตั้ง
 
 ```bash
 npm install
 cp .env.example .env.local   # ใส่ GEMINI_API_KEY — ขอฟรีได้ที่ aistudio.google.com/apikey
+                              # + DATABASE_URL — ดูหัวข้อ "ตั้งค่า Database" ด้านล่าง (จำเป็นสำหรับหน้า /history)
+npx prisma migrate dev       # สร้างตาราง ReviewLog ใน database (รันครั้งแรกครั้งเดียว)
 npm run dev
 ```
 
@@ -143,8 +145,43 @@ AI review (`lib/prompts.ts`) ยังทำได้ดีกว่ามาก
   ลบทีละรายการหรือล้างทั้งหมดได้
 
 ทุกอย่างในหน้านี้ (ยกเว้น System Status ที่เช็คสดจาก server) **มาจาก `localStorage` ของเบราว์เซอร์คุณเอง**
-ไม่มี database — ทุกครั้งที่ review สำเร็จจากหน้าแรก จะถูกเก็บลง `localStorage` อัตโนมัติ (เก็บ 25 รายการล่าสุด)
-ดังนั้นประวัติจะเห็นเฉพาะในเบราว์เซอร์/เครื่องที่รัน review เท่านั้น
+ไม่ใช้ database — ทุกครั้งที่ review สำเร็จจากหน้าแรก จะถูกเก็บลง `localStorage` อัตโนมัติ (เก็บ 25 รายการล่าสุด)
+ดังนั้นประวัติส่วนนี้จะเห็นเฉพาะในเบราว์เซอร์/เครื่องที่รัน review เท่านั้น — **อย่าสับสนกับหน้า
+History Log** ด้านล่างซึ่งเป็นคนละระบบ เก็บลง database จริงและเห็นเหมือนกันทุกคนในทีม
+
+## History Log (`/history`)
+
+ต่างจาก "ประวัติ Review" ใน Dashboard (เก็บ local เฉพาะเบราว์เซอร์ตัวเอง) — หน้านี้เก็บลง
+**database จริง (PostgreSQL ผ่าน Prisma)** ทุกคนในทีมเห็นประวัติเดียวกัน ใช้ track ว่า issue ไหน
+แก้แล้ว/ยังไม่แก้:
+
+- ทุกครั้งที่ review (ทั้ง AI Review และ Quick Scan) เสร็จ จะถูกบันทึกอัตโนมัติเป็น log แบบ
+  asynchronous (ผ่าน Next.js `after()` — ไม่ทำให้ user รอนานขึ้น และไม่ทำให้ flow การ review
+  พังถ้าบันทึก log ไม่สำเร็จ)
+- สถานะเริ่มต้น: `FLAGGED` ถ้าเจอ issue, `RESOLVED` ถ้าไม่เจอเลย, `FAILED` ถ้า Gemini error/timeout
+  ระหว่างวิเคราะห์ (นับเฉพาะ error จริงที่เกี่ยวกับการวิเคราะห์ ไม่นับ 401/429 ที่เป็น request error)
+- filter ได้ตามช่วงวันที่และสถานะ
+- **`FLAGGED` → `RESOLVED` เปลี่ยนเองผ่านหน้าเว็บไม่ได้** (ไม่มีปุ่มกด) — เปลี่ยนให้อัตโนมัติเฉพาะ
+  ตอนรีวิว PR/MR URL เดิมซ้ำแล้วไม่พบปัญหาแล้วจริงเท่านั้น (ตั้งใจออกแบบแบบนี้ กันมาร์กว่าแก้แล้ว
+  ทั้งที่ยังไม่ได้ verify จริง) ใช้ได้เฉพาะ source ที่เป็น PR/MR URL เท่านั้น — รีวิวแบบวางโค้ด/diff
+  ตรงๆ ไม่มี URL ให้จับคู่ จะค้างเป็น `FLAGGED` ตลอดไป
+
+**ต้องตั้งค่า `DATABASE_URL` ก่อนถึงจะใช้หน้านี้ได้** (ดูหัวข้อติดตั้งด้านล่าง) — ถ้าไม่ตั้ง หน้าอื่น
+ทั้งหมดยังใช้งานได้ปกติ มีแค่หน้า `/history` ที่จะขึ้น error บอกให้ตั้งค่าก่อน
+
+### ตั้งค่า Database
+
+1. Vercel project → แท็บ **Storage** → **Create Database** → เลือก **Postgres** (ผ่าน Neon,
+   ฟรีสำหรับใช้งานเบา ๆ) → เชื่อมกับ project นี้ (จะ auto-inject env vars ให้บางส่วน แต่ยังต้อง
+   copy ค่ามาใส่ `DATABASE_URL` เองตามข้อ 2)
+2. Copy connection string มาใส่ `DATABASE_URL` ใน `.env.local` (dev) และ Vercel Environment
+   Variables (production)
+3. รัน migration ครั้งแรก (สร้างตาราง `ReviewLog` ใน database):
+   ```bash
+   npx prisma migrate deploy
+   ```
+   (ตอน dev ครั้งแรกที่ยังไม่มี migration ไฟล์เลย ใช้ `npx prisma migrate dev --name init` แทน
+   เพื่อให้สร้างไฟล์ migration แรกให้ด้วย)
 
 ## โครงสร้างโปรเจกต์
 

@@ -7,7 +7,7 @@ GitLab MR แล้วส่งให้ Google Gemini วิเคราะห�
 
 ## Stack
 Next.js 15 (App Router, TypeScript) · Tailwind + Shadcn UI (dark theme) ·
-`@google/genai` · GitHub/GitLab REST API · deploy บน Vercel
+`@google/genai` · GitHub/GitLab REST API · Prisma 7 + PostgreSQL (History Log) · deploy บน Vercel
 
 ## จุดสำคัญที่ต้องรู้ก่อนแก้โค้ด
 
@@ -22,6 +22,24 @@ Next.js 15 (App Router, TypeScript) · Tailwind + Shadcn UI (dark theme) ·
   Gemini โดนโควตา ต้องมี `files:` glob ชัดเจนใน ESLint flat config ไม่งั้น `.ts` จะไม่โดนตรวจ
 - **`next.config.mjs`** ต้องมี `serverExternalPackages: ["eslint", "@typescript-eslint/parser", ...]`
   ไม่งั้น webpack จะ bundle ESLint พังตอน build
+- **Prisma 7 (สำคัญ — ต่างจากที่ความจำเก่าอาจรู้จัก)**: `datasource.url` ใน `schema.prisma` **ใช้ไม่ได้แล้ว**
+  ต้องตั้งค่าผ่าน `prisma.config.ts` (ฝั่ง CLI: generate/migrate) + `lib/prisma.ts` ที่สร้าง
+  `PrismaClient` ผ่าน driver adapter (`@prisma/adapter-pg`'s `PrismaPg`) แทนการส่ง `url` ตรง ๆ —
+  ถ้าจะรัน `npm install prisma` ใหม่ **ต้อง pin version** (เช่น `prisma@7.10.0`) เพราะ dist-tag
+  `latest` บน npm ตอนนี้ชี้ไปที่ `8.0.0-rc.19` (pre-release ที่ CLI เปลี่ยนไปคนละแบบเลย ไม่ใช่ตัวเสถียร)
+- **History Log (`/history`, `lib/review-log.ts`)**: บันทึกทุก review (AI + Quick Scan) ลง Postgres
+  แบบ async ผ่าน Next.js `after()` (ไม่บล็อก response, ไม่ทำให้ flow หลักพังถ้า DB ล่ม) — คนละระบบ
+  กับ "ประวัติ Review" ใน Dashboard ที่ยังเป็น `localStorage` เดิม (`lib/history.ts`, ไม่ได้ลบทิ้ง)
+  อย่าสับสน/รวมสองระบบนี้เข้าด้วยกันถ้าไม่ได้ตั้งใจ
+- **สถานะ FLAGGED → RESOLVED เปลี่ยนได้ทางเดียว คือ auto-resolve เท่านั้น ห้ามเพิ่มทางแก้ manual
+  กลับมาอีกถ้า user ไม่ได้ขอ** — เคยมีปุ่ม/API ให้กดเปลี่ยนสถานะเองได้ (`PATCH /api/history/[id]`)
+  แต่ user บอกชัดว่าไม่ไว้ใจการกดมโนเอง เลยลบออกและเปลี่ยนเป็น: `logReviewResult()` จะเช็คอัตโนมัติ
+  ทุกครั้งที่ review ใหม่ "ผ่าน" (ไม่เจอ issue เลย) — ถ้า `sourceKind` ไม่ใช่ `"paste"` จะไป
+  `updateMany` เปลี่ยน log เก่าที่ `sourceLabel` ตรงกันทุกอันจาก FLAGGED เป็น RESOLVED ให้เอง
+  (ตรรกะ: ต้องรีวิว PR/MR URL เดิมซ้ำแล้วผ่านจริงเท่านั้นถึงจะนับว่าแก้แล้ว) — `sourceKind: "paste"`
+  ถูก exclude เพราะ sourceLabel เป็นค่าคงที่ "pasted code" จับคู่ตัวตนโค้ดจริงไม่ได้ จึงค้างเป็น
+  FLAGGED ตลอดไปถ้า review จาก paste ไม่ใช่ PR/MR URL — ทดสอบ logic นี้ผ่านจริงแล้วด้วย script
+  ชั่วคราว (`npx tsx -r dotenv/config ...` ยิง `logReviewResult` 2 รอบตรง ๆ เช็ค DB จริง) ไม่ใช่แค่เดา
 
 ## Deploy
 
@@ -33,12 +51,36 @@ Next.js 15 (App Router, TypeScript) · Tailwind + Shadcn UI (dark theme) ·
 - Environment Variables ต้องไปตั้งเองในหน้า Vercel Project Settings (ไม่ sync จาก `.env.local`
   อัตโนมัติหลัง initial import) — เช็คให้แน่ใจว่าใส่ `GEMINI_API_KEY` จริงแล้ว ไม่งั้นปุ่ม
   "Review with AI" บน production จะใช้งานไม่ได้ (Quick Scan ใช้ได้ปกติเพราะไม่พึ่ง Gemini)
+- **`DATABASE_URL` จำเป็นสำหรับหน้า `/history`** (Vercel → Storage → Create Database → Postgres) —
+  ตั้งค่าแล้วต้องรัน `npx prisma migrate deploy` ครั้งแรกด้วยเพื่อสร้างตาราง `ReviewLog` ไม่งั้น
+  หน้า `/history` จะ error แม้จะตั้ง `DATABASE_URL` ถูกแล้วก็ตาม (หน้าอื่นไม่กระทบ ใช้ได้ปกติ)
+
+## Database (History Log) — สถานะปัจจุบัน
+
+- **Provision แล้วจริง**: ใช้ Neon Postgres ผ่าน Vercel Storage integration (region Singapore,
+  แผน Free) ชื่อ resource `nodeguard-history` — เชื่อมกับ project `nodeguard-ai-v2` ครบทั้ง 3
+  environment (Production, Preview, Development) **ใช้ database เดียวกันทั้งหมด ไม่ได้แยก branch**
+  (เลือกแบบง่ายที่สุดตั้งใจ ไม่ใช่ default ของ Neon) — แปลว่าข้อมูลทดสอบจากเครื่อง dev กับข้อมูลจริง
+  บน production **ปนกันอยู่ในฐานเดียวกัน** ถ้า user อยากแยกทีหลังค่อยสร้าง Neon database อีกตัว
+  แยกไว้สำหรับ local dev
+- Custom Prefix ตอนเชื่อม integration ตั้งเป็น `DATABASE` (ไม่ใช่ default `STORAGE`) เพื่อให้ได้
+  ชื่อตัวแปร `DATABASE_URL` ตรงกับที่โค้ดอ่านพอดี ไม่ต้อง rename เพิ่ม
+- **รัน migration แรกแล้ว** (`npx prisma migrate dev --name init` — ไฟล์อยู่ที่
+  `prisma/migrations/20261001094530_init/`, commit ขึ้น git แล้ว) — ทดสอบ end-to-end ผ่านจริง
+  แล้วด้วย (Quick Scan → เช็ค `/api/history` เจอ record จริง → PATCH เปลี่ยนสถานะสำเร็จ) มีข้อมูล
+  ทดสอบ 1 รายการ (`sourceLabel: "pasted code"`, severity critical) ค้างอยู่ใน DB จริงที่ยังไม่ได้ลบ
+- ไม่มีระบบลบข้อมูลเก่าอัตโนมัติ — เก็บทุกแถวตลอดไป ที่ storage ฟรี 0.5GB คาดว่าใช้ได้อีกหลายปี
+  ตามขนาดการใช้งานจริงของทีม (ดูวิธีคำนวณในบทสนทนาเดิม) ถ้า user อยากได้ retention policy
+  (เช่น ลบที่เก่ากว่า N เดือน) ยังไม่ได้ทำ — เสนอไว้แล้วแต่ user ยังไม่ได้ตัดสินใจ
 
 ## งานที่ค้างอยู่ (ยังไม่ยืนยันกับ user)
 
 - `nodeguard.iamhong.me` ตอนนี้ตั้งเป็น "Production" domain เดี่ยว ๆ ใน Vercel — ยังไม่ได้ถามว่า
   อยากให้ทำ redirect หรือปล่อยไว้แบบนี้ต่อ (ประเด็น SEO duplicate content ถ้ามีโดเมนอื่นชี้มาซ้ำ)
-- ยังไม่ยืนยันว่า user กรอกค่า Environment Variables จริงบน Vercel แล้ว redeploy หรือยัง
+- ยังไม่ยืนยันว่า user กรอกค่า Environment Variables (GEMINI_API_KEY ฯลฯ) จริงบน Vercel แล้ว
+  redeploy หรือยัง (คนละเรื่องกับ DATABASE_URL ที่ตั้งเสร็จและทดสอบผ่านแล้ว)
+- History Log feature พึ่ง commit + push แล้วให้ Vercel deploy — ยังไม่ยืนยันว่า deploy
+  production ผ่านจริงหรือเจอปัญหาอะไรระหว่าง deploy ไหม (ทดสอบผ่านแค่บนเครื่อง local)
 
 ## Commit convention
 - **ห้าม Claude รัน `git commit` เองเด็ดขาด** (แก้ไขจากกฎเดิมที่แค่ "ต้องถามก่อน" — ตอนนี้เข้มกว่านั้น

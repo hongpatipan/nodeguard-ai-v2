@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 
 import { ApiError, extractGeminiMessage, generateContentWithRetry, getGeminiClient } from "@/lib/gemini-client";
 import { DEFAULT_MODEL, getFallbackModel, isValidModel, type GeminiModelId } from "@/lib/gemini-models";
@@ -7,7 +7,8 @@ import { REVIEW_RESPONSE_SCHEMA } from "@/lib/gemini-schema";
 import { filterNodeDiff, prepareReviewInput, type FilterResult } from "@/lib/node-diff-filter";
 import { estimateUsage } from "@/lib/gemini-pricing";
 import { NODE_REVIEW_SYSTEM_INSTRUCTION, buildUserMessage } from "@/lib/prompts";
-import { ReviewSchema } from "@/lib/types";
+import { logReviewFailure, logReviewResult } from "@/lib/review-log";
+import { ReviewSchema, type ReviewResponse } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -115,12 +116,9 @@ export async function POST(request: Request) {
         fallbackUsed = true;
       } catch (fallbackError) {
         if (isTransientApiError(fallbackError)) {
-          return NextResponse.json(
-            {
-              error: `เซิร์ฟเวอร์ Gemini โหลดสูงทั้ง ${model} และ ${fallbackModel} — ลองทั้งสองโมเดลแล้วไม่สำเร็จ รอสักครู่แล้วลองใหม่`,
-            },
-            { status: 503 },
-          );
+          const msg = `เซิร์ฟเวอร์ Gemini โหลดสูงทั้ง ${model} และ ${fallbackModel} — ลองทั้งสองโมเดลแล้วไม่สำเร็จ รอสักครู่แล้วลองใหม่`;
+          after(() => logReviewFailure({ sourceKind: source.kind, sourceLabel: source.label, model, errorMessage: msg }));
+          return NextResponse.json({ error: msg }, { status: 503 });
         }
         throw fallbackError; // error คนละแบบ (เช่น key ผิด) — ให้ catch ข้างนอกจัดการตามปกติ
       }
@@ -128,22 +126,25 @@ export async function POST(request: Request) {
 
     const rawText = response.text;
     if (!rawText) {
-      return NextResponse.json({ error: "Gemini ไม่ตอบเนื้อหากลับมา (อาจโดน safety filter)" }, { status: 502 });
+      const msg = "Gemini ไม่ตอบเนื้อหากลับมา (อาจโดน safety filter)";
+      after(() => logReviewFailure({ sourceKind: source.kind, sourceLabel: source.label, model: usedModel, errorMessage: msg }));
+      return NextResponse.json({ error: msg }, { status: 502 });
     }
 
     let parsedJson: unknown;
     try {
       parsedJson = JSON.parse(rawText);
     } catch {
-      return NextResponse.json({ error: "Gemini ตอบกลับไม่ใช่ JSON ที่ parse ได้" }, { status: 502 });
+      const msg = "Gemini ตอบกลับไม่ใช่ JSON ที่ parse ได้";
+      after(() => logReviewFailure({ sourceKind: source.kind, sourceLabel: source.label, model: usedModel, errorMessage: msg }));
+      return NextResponse.json({ error: msg }, { status: 502 });
     }
 
     const parsedReview = ReviewSchema.safeParse(parsedJson);
     if (!parsedReview.success) {
-      return NextResponse.json(
-        { error: "Gemini ตอบกลับในรูปแบบที่ไม่ตรง schema", detail: parsedReview.error.flatten() },
-        { status: 502 },
-      );
+      const msg = "Gemini ตอบกลับในรูปแบบที่ไม่ตรง schema";
+      after(() => logReviewFailure({ sourceKind: source.kind, sourceLabel: source.label, model: usedModel, errorMessage: msg }));
+      return NextResponse.json({ error: msg, detail: parsedReview.error.flatten() }, { status: 502 });
     }
 
     const review = parsedReview.data;
@@ -155,7 +156,7 @@ export async function POST(request: Request) {
     };
     review.issues.sort((a, b) => order[a.severity] - order[b.severity]);
 
-    return NextResponse.json({
+    const result: ReviewResponse = {
       review,
       usage: estimateUsage(usedModel, response.usageMetadata ?? {}),
       filterStats: prepared.stats,
@@ -163,7 +164,12 @@ export async function POST(request: Request) {
       model: usedModel,
       requestedModel: model,
       fallbackUsed,
-    });
+    };
+
+    // บันทึก history log หลังตอบ response แล้ว (ไม่ทำให้ user รอนานขึ้น, ไม่ทำให้ flow หลักพังถ้า log พลาด)
+    after(() => logReviewResult({ sourceKind: source.kind, sourceLabel: source.label, model: usedModel, result }));
+
+    return NextResponse.json(result);
   } catch (error) {
     // ApiError (จาก @google/genai) มี .status ให้แยก retryable (429/5xx) ออกจาก non-retryable (401/403) ได้ตรง ๆ
     if (error instanceof ApiError) {
@@ -183,13 +189,12 @@ export async function POST(request: Request) {
       }
       if (error.status === 503 || error.status === 500) {
         // ไม่มีโมเดลสำรองให้ลอง (getFallbackModel คืนโมเดลเดิม) หรือ retry ในตัวหมดไปแล้ว
-        return NextResponse.json(
-          {
-            error: `เซิร์ฟเวอร์ Gemini กำลังโหลดสูง (ไม่เกี่ยวกับโควตาของคุณ) — ${extractGeminiMessage(error.message)} ลองกด Review อีกครั้งใน 10-20 วินาที`,
-          },
-          { status: 503 },
-        );
+        const msg = `เซิร์ฟเวอร์ Gemini กำลังโหลดสูง (ไม่เกี่ยวกับโควตาของคุณ) — ${extractGeminiMessage(error.message)} ลองกด Review อีกครั้งใน 10-20 วินาที`;
+        after(() => logReviewFailure({ sourceKind: source.kind, sourceLabel: source.label, model, errorMessage: msg }));
+        return NextResponse.json({ error: msg }, { status: 503 });
       }
+      // 401/403 (key ผิด) และ 429 (rate limit) ไม่นับเป็น "analysis failed" — เป็น request error
+      // ของผู้ใช้ ไม่เกี่ยวกับการวิเคราะห์โค้ดจริง เลยไม่บันทึกลง history log
       return NextResponse.json(
         { error: `Gemini API error ${error.status}: ${extractGeminiMessage(error.message)}` },
         { status: error.status >= 500 ? 502 : 400 },
@@ -197,6 +202,7 @@ export async function POST(request: Request) {
     }
 
     const message = error instanceof Error ? error.message : "review ล้มเหลว";
+    after(() => logReviewFailure({ sourceKind: source.kind, sourceLabel: source.label, model, errorMessage: message }));
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

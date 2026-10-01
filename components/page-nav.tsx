@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Terminal } from "lucide-react";
+import { History, LayoutDashboard, Terminal } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
   { href: "/", label: "Review", icon: Terminal },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/history", label: "History", icon: History },
 ];
 
 // โลโก้ shield + checkmark แบบเดียวกับ app/icon.svg และ app/opengraph-image.tsx

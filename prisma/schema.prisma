@@ -1,0 +1,54 @@
+// Prisma schema — History Log & Audit Trail
+// ใช้ Postgres (แนะนำ Vercel Postgres/Neon เพราะ deploy บน Vercel อยู่แล้ว ตั้งค่าได้จากหน้า Storage
+// ของ Vercel project โดยตรง ไม่ต้องสมัครบริการภายนอกเพิ่ม) — ตั้งค่า DATABASE_URL ใน .env.local
+// (dev) และ Vercel Environment Variables (production) ดูขั้นตอนเต็มใน README.md
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Prisma 7: ห้ามใส่ url ในนี้แล้ว — ย้ายไปตั้งค่าใน prisma.config.ts (CLI) และ lib/prisma.ts
+// (runtime, ผ่าน driver adapter @prisma/adapter-pg) แทน — ดู pris.ly/d/prisma7-client-config
+datasource db {
+  provider = "postgresql"
+}
+
+enum LogSeverity {
+  critical
+  warning
+  optimization
+  passed // ไม่พบปัญหาเลย (verdict = approve, issues ว่าง)
+}
+
+enum LogStatus {
+  FLAGGED // พบปัญหา ยังไม่ได้แก้
+  RESOLVED // แก้ไขแล้ว (หรือไม่พบปัญหาตั้งแต่แรก — เริ่มเป็น RESOLVED เลย)
+  FAILED // Gemini error/timeout ระหว่างวิเคราะห์ — ไม่มีผลตรวจให้ดู
+}
+
+model ReviewLog {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // ที่มาของโค้ดที่ตรวจ
+  sourceKind  String // "github" | "gitlab" | "paste"
+  sourceLabel String // เช่น "owner/repo#123" หรือ "วางโค้ดเอง"
+
+  // โมเดล/วิธีที่ใช้ตรวจ
+  model String // เช่น "gemini-3.8-flash" หรือ "quick-scan"
+
+  issuesFoundCount Int
+  severity         LogSeverity
+  status           LogStatus @default(FLAGGED)
+
+  // เก็บผลตรวจเต็ม (summary, verdict, issues[]) เป็น JSON — ไม่มี API key/token ปนอยู่แน่นอน
+  // เพราะ ReviewResponse ที่ส่งมาจาก Gemini ไม่เคยมีข้อมูลพวกนี้ตั้งแต่ต้น
+  fullReviewOutput Json
+
+  // ข้อความ error (เฉพาะตอน status = FAILED)
+  errorMessage String?
+
+  @@index([createdAt])
+  @@index([status])
+}

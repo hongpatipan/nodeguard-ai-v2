@@ -3,7 +3,7 @@ import { fetchFileContent as fetchGithubFileContent, fetchPullRequestDiff, parse
 import { fetchFileContent as fetchGitlabFileContent, fetchMergeRequestDiff, parseMergeRequestUrl } from "./gitlab";
 import { getSkipReason, parseUnifiedDiff, type DiffFile } from "./node-diff-filter";
 
-export type VcsSource = { kind: "github" | "gitlab"; label: string };
+export type VcsSource = { kind: "github" | "gitlab"; label: string; headSha: string };
 
 export type VcsDiffResult = { diff: string; source: VcsSource };
 
@@ -16,13 +16,13 @@ export async function fetchDiffFromUrl(url: string): Promise<VcsDiffResult | { e
   const ghRef = parsePullRequestUrl(url);
   if (ghRef) {
     const pr = await fetchPullRequestDiff(ghRef);
-    return { diff: pr.diff, source: { kind: "github", label: pr.label } };
+    return { diff: pr.diff, source: { kind: "github", label: pr.label, headSha: pr.headSha } };
   }
 
   const glRef = parseMergeRequestUrl(url);
   if (glRef) {
     const mr = await fetchMergeRequestDiff(glRef);
-    return { diff: mr.diff, source: { kind: "gitlab", label: mr.label } };
+    return { diff: mr.diff, source: { kind: "gitlab", label: mr.label, headSha: mr.headSha } };
   }
 
   return { error: URL_HELP };
@@ -92,6 +92,7 @@ export async function fetchChangedFileContents(url: string): Promise<VcsFilesRes
     return collectFiles(parsed, pr.headSha, (path, sha) => fetchGithubFileContent(ghRef, path, sha), {
       kind: "github",
       label: pr.label,
+      headSha: pr.headSha,
     });
   }
 
@@ -102,6 +103,7 @@ export async function fetchChangedFileContents(url: string): Promise<VcsFilesRes
     return collectFiles(parsed, mr.headSha, (path, sha) => fetchGitlabFileContent(glRef, path, sha), {
       kind: "gitlab",
       label: mr.label,
+      headSha: mr.headSha,
     });
   }
 

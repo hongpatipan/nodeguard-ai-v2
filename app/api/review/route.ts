@@ -47,6 +47,8 @@ export async function POST(request: Request) {
   // ---- 1. เตรียม input: GitHub PR หรือโค้ดที่วางมา ----
   let prepared: FilterResult;
   let source: { kind: "github" | "gitlab" | "paste"; label: string };
+  // commit SHA ของโค้ดที่ตรวจ (มีเฉพาะ PR/MR, paste ไม่มี) — ใช้กันซ้ำตอนบันทึก history log เท่านั้น
+  let commitSha: string | undefined;
 
   try {
     if (body.url?.trim()) {
@@ -56,6 +58,7 @@ export async function POST(request: Request) {
       }
       prepared = filterNodeDiff(result.diff, { maxChars: MAX_DIFF_CHARS });
       source = result.source;
+      commitSha = result.source.headSha || undefined;
     } else if (body.code?.trim()) {
       prepared = prepareReviewInput(body.code, { maxChars: MAX_DIFF_CHARS });
       source = { kind: "paste", label: "pasted code / diff" };
@@ -167,7 +170,16 @@ export async function POST(request: Request) {
     };
 
     // บันทึก history log หลังตอบ response แล้ว (ไม่ทำให้ user รอนานขึ้น, ไม่ทำให้ flow หลักพังถ้า log พลาด)
-    after(() => logReviewResult({ sourceKind: source.kind, sourceLabel: source.label, model: usedModel, result }));
+    after(() =>
+      logReviewResult({
+        sourceKind: source.kind,
+        sourceLabel: source.label,
+        model: usedModel,
+        result,
+        filesReviewed: prepared.files.map((f) => f.path),
+        commitSha,
+      }),
+    );
 
     return NextResponse.json(result);
   } catch (error) {

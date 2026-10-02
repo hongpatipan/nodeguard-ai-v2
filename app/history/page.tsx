@@ -25,6 +25,8 @@ type LogItem = {
   severity: LogSeverity;
   status: LogStatus;
   errorMessage: string | null;
+  flaggedFiles: string[];
+  scanCount: number;
 };
 
 type ListResponse = { items: LogItem[]; total: number; page: number; pageSize: number; totalPages: number };
@@ -107,10 +109,11 @@ export default function HistoryPage() {
           ประวัติการ review ทุกครั้ง (ทั้ง AI Review และ Quick Scan) — filter ตามวันที่/สถานะได้
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          สถานะ <span className="font-medium text-foreground">แก้ไขแล้ว</span> เปลี่ยนให้อัตโนมัติ
-          เฉพาะตอนรีวิว PR/MR เดิม (URL เดียวกัน) ซ้ำแล้วไม่พบปัญหาแล้วจริงเท่านั้น — กดเปลี่ยนเองไม่ได้
-          เพื่อกันการมาร์กว่าแก้แล้วทั้งที่ยังไม่ได้ verify จริง (ใช้ได้เฉพาะรีวิวผ่าน PR/MR URL
-          เท่านั้น การวางโค้ด/diff ตรงๆ ไม่มี URL ให้จับคู่จึงค้างเป็น "พบปัญหา" ตลอดไป)
+          สถานะ <span className="font-medium text-foreground">แก้ไขแล้ว</span> เปลี่ยนให้อัตโนมัติเท่านั้น
+          — กดเปลี่ยนเองไม่ได้ เพื่อกันการมาร์กว่าแก้แล้วทั้งที่ยังไม่ได้ verify จริง จับคู่ด้วย
+          "repo เดียวกัน + ไฟล์ที่เคยมีปัญหา" ไม่ใช่ PR/MR URL เดิม เลยใช้ได้แม้แก้จริงใน PR/MR ใบใหม่
+          คนละใบ (เช่น PR เก่า merge ไปแล้ว) — ใช้ได้เฉพาะรีวิวผ่าน PR/MR URL เท่านั้น การวางโค้ด/diff
+          ตรงๆ ไม่มี repo ให้จับคู่ จึงค้างเป็น "พบปัญหา" ตลอดไป
         </p>
       </header>
 
@@ -218,8 +221,18 @@ export default function HistoryPage() {
                     <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                       {formatDate(item.createdAt)}
                     </TableCell>
-                    <TableCell className="max-w-[220px] truncate text-xs" title={item.sourceLabel}>
-                      {item.sourceLabel}
+                    <TableCell className="max-w-[220px] text-xs" title={item.sourceLabel}>
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate">{item.sourceLabel}</span>
+                        {item.scanCount > 1 ? (
+                          <span
+                            className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+                            title={`สแกนโค้ดชุดเดียวกันนี้ซ้ำ ${item.scanCount} ครั้ง`}
+                          >
+                            ×{item.scanCount}
+                          </span>
+                        ) : null}
+                      </div>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">{item.model}</TableCell>
                     <TableCell className="text-xs">{item.issuesFoundCount}</TableCell>
@@ -231,7 +244,9 @@ export default function HistoryPage() {
                         variant={STATUS_BADGE[item.status]}
                         title={
                           item.status === "FLAGGED" && item.sourceKind !== "paste"
-                            ? "จะเปลี่ยนเป็นแก้ไขแล้วอัตโนมัติเมื่อรีวิว PR/MR นี้ซ้ำแล้วไม่พบปัญหา"
+                            ? item.flaggedFiles.length > 0
+                              ? `จะแก้ไขแล้วอัตโนมัติเมื่อไฟล์เหล่านี้สะอาด (รีวิว repo นี้ที่ไหนก็ได้): ${item.flaggedFiles.join(", ")}`
+                              : "จะเปลี่ยนเป็นแก้ไขแล้วอัตโนมัติเมื่อไฟล์ที่เคยมีปัญหาถูกรีวิวซ้ำแล้วสะอาด"
                             : undefined
                         }
                       >

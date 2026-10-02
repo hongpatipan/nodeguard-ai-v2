@@ -39,7 +39,14 @@ export async function POST(request: Request) {
       }
       const response = buildQuickScanResponse(result.files, result.skippedFiles, result.source, result.totalFiles);
       after(() =>
-        logReviewResult({ sourceKind: result.source.kind, sourceLabel: result.source.label, model: "quick-scan", result: response }),
+        logReviewResult({
+          sourceKind: result.source.kind,
+          sourceLabel: result.source.label,
+          model: "quick-scan",
+          result: response,
+          filesReviewed: result.files.map((f) => f.path),
+          commitSha: result.source.headSha || undefined,
+        }),
       );
       return NextResponse.json(response);
     }
@@ -58,7 +65,15 @@ export async function POST(request: Request) {
       const code = body.code.slice(0, MAX_CODE_CHARS);
       const source = { kind: "paste" as const, label: "pasted code" };
       const response = buildQuickScanResponse([{ path: "pasted-code.ts", content: code }], [], source, 1);
-      after(() => logReviewResult({ sourceKind: source.kind, sourceLabel: source.label, model: "quick-scan", result: response }));
+      after(() =>
+        logReviewResult({
+          sourceKind: source.kind,
+          sourceLabel: source.label,
+          model: "quick-scan",
+          result: response,
+          filesReviewed: ["pasted-code.ts"],
+        }),
+      );
       return NextResponse.json(response);
     }
 

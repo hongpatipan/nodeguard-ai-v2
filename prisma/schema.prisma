@@ -34,6 +34,16 @@ model ReviewLog {
   // ที่มาของโค้ดที่ตรวจ
   sourceKind  String // "github" | "gitlab" | "paste"
   sourceLabel String // เช่น "owner/repo#123" หรือ "วางโค้ดเอง"
+  // "owner/repo" (github) หรือ "group/project" (gitlab) — ตัดเลข PR/MR ออก ใช้จับคู่ auto-resolve
+  // ข้าม PR คนละใบได้ (null สำหรับ paste เพราะไม่มี repo ให้จับคู่จริง)
+  repoKey String?
+  // commit SHA ของโค้ดที่ตรวจตอนนั้น (PR/MR เท่านั้น, null สำหรับ paste) — ใช้กันซ้ำตอนกดสแกนรัว ๆ
+  // บน PR เดิมที่โค้ดยังไม่เปลี่ยนเลย (แม่นยำกว่าเทียบว่า "ปัญหาหน้าตาเหมือนกันไหม" เพราะ SHA
+  // บอกตรง ๆ ว่าโค้ดชุดเดียวกันเป๊ะหรือเปล่า ไม่มีทางกำกวม)
+  commitSha String?
+  // จำนวนครั้งที่สแกน "โค้ดชุดเดียวกันเป๊ะ" (repo+PR+commit+model ตรงกันหมด) ซ้ำ — แทนที่จะสร้าง
+  // แถวใหม่ทุกครั้งที่กดซ้ำเฉย ๆ โดยโค้ดไม่เปลี่ยน ก็แค่นับเพิ่มในแถวเดิม ไม่เสีย audit trail
+  scanCount Int @default(1)
 
   // โมเดล/วิธีที่ใช้ตรวจ
   model String // เช่น "gemini-3.8-flash" หรือ "quick-scan"
@@ -41,6 +51,12 @@ model ReviewLog {
   issuesFoundCount Int
   severity         LogSeverity
   status           LogStatus @default(FLAGGED)
+
+  // รายชื่อไฟล์ทั้งหมดที่ถูกสแกนรอบนี้ (ไม่ใช่แค่ไฟล์ที่เจอปัญหา) — ใช้เช็คว่า "ไฟล์นี้เคยถูก
+  // ตรวจซ้ำแล้วจริง" ตอน auto-resolve, และ flaggedFiles คือ subset ของไฟล์ที่เจอปัญหาจริง
+  // (ว่างถ้า RESOLVED/passed) ใช้เทียบว่า log เก่าควรเปลี่ยนเป็น RESOLVED ไหม
+  filesReviewed String[]
+  flaggedFiles  String[]
 
   // เก็บผลตรวจเต็ม (summary, verdict, issues[]) เป็น JSON — ไม่มี API key/token ปนอยู่แน่นอน
   // เพราะ ReviewResponse ที่ส่งมาจาก Gemini ไม่เคยมีข้อมูลพวกนี้ตั้งแต่ต้น
@@ -51,4 +67,6 @@ model ReviewLog {
 
   @@index([createdAt])
   @@index([status])
+  @@index([repoKey, status])
+  @@index([repoKey, commitSha, model])
 }

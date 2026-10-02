@@ -23,8 +23,10 @@ function overallSeverity(review: ReviewResponse["review"]): LogSeverity {
  * ("owner/repo" / "group/project") — ใช้จับคู่ auto-resolve ข้าม PR/MR คนละใบได้ (เช่น PR เก่า
  * merge ไปแล้ว แต่แก้จริงใน PR ใหม่) คืน null ถ้าเป็น "paste" หรือ parse ไม่ได้ (ไม่มี repo ให้จับคู่)
  */
+const REPO_SEPARATOR: Record<string, string> = { github: "#", gitlab: "!" };
+
 function extractRepoKey(sourceKind: string, sourceLabel: string): string | null {
-  const sep = sourceKind === "github" ? "#" : sourceKind === "gitlab" ? "!" : null;
+  const sep = REPO_SEPARATOR[sourceKind];
   if (!sep) return null;
   const idx = sourceLabel.indexOf(sep);
   return idx === -1 ? null : sourceLabel.slice(0, idx);

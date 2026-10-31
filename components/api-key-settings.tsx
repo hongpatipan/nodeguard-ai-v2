@@ -103,7 +103,12 @@ export function ApiKeySettings({ apiKey, onChange }: Props) {
             }}
             placeholder="AIzaSy..."
             spellCheck={false}
-            autoComplete="off"
+            // Chrome เพิกเฉย autoComplete="off" สำหรับ type="password" โดยเฉพาะ (ตั้งใจของ Chrome เอง)
+            // ต้องใช้ "new-password" ถึงจะกันหน้าต่าง "บันทึกรหัสผ่านนี้ไหม" ได้จริง — ค่านี้ไม่ใช่
+            // รหัสผ่าน login เลย แค่ใช้ type="password" เพื่อซ่อนตัวอักษรบนจอเฉยๆ
+            autoComplete="new-password"
+            data-lpignore="true"
+            data-1p-ignore
             className="pr-9 font-mono"
           />
           <button
